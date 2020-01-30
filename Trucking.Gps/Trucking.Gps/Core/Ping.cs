@@ -1,4 +1,4 @@
-﻿namespace Trucking.Gps
+﻿namespace Trucking.Gps.Core
 {
     public class Ping
     {

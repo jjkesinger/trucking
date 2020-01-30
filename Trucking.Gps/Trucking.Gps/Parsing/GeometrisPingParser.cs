@@ -1,4 +1,5 @@
 ﻿using System;
+using Trucking.Gps.Core;
 
 namespace Trucking.Gps.Parsing
 {

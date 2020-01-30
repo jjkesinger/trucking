@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Trucking.Gps.Core;
 
 namespace Trucking.Gps.Parsing
 {
@@ -12,7 +13,11 @@ namespace Trucking.Gps.Parsing
         public BasePingParser(Func<string, Ping> parse)
         {
             _source = new BufferBlock<Ping>();
-            _target = new ActionBlock<string>(msg => ((BufferBlock<Ping>)_source).Post(parse(msg)));
+            _target = new ActionBlock<string>(async msg => await ((BufferBlock<Ping>)_source).SendAsync(parse(msg)), 
+                new ExecutionDataflowBlockOptions
+                {
+                    MaxDegreeOfParallelism = DataflowBlockOptions.Unbounded
+                });
 
             _target.Completion.ContinueWith((t) =>
             {

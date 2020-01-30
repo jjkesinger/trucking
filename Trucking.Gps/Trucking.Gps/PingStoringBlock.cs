@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 
@@ -10,22 +11,16 @@ namespace Trucking.Gps
         private readonly ITargetBlock<string> _target;
         private readonly ISourceBlock<string[]> _source;
 
-        private readonly IList<Task> _pendingTasks = new List<Task>();
-
         public PingStoringBlock(Func<string[], Task> storeFunc)
         {
             _source = new BatchBlock<string>(25);
-            for (int i = 0; i < 100; i++)
-            {
-                var storageBlock = new ActionBlock<string[]>(storeFunc, new ExecutionDataflowBlockOptions { BoundedCapacity = 1 });
-                _source.LinkTo(storageBlock, new DataflowLinkOptions { PropagateCompletion = true });
 
-                _pendingTasks.Add(storageBlock.Completion);
-            }
+             var storageBlock = new ActionBlock<string[]>(storeFunc, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = DataflowBlockOptions.Unbounded });
+            _source.LinkTo(storageBlock, new DataflowLinkOptions { PropagateCompletion = true });
 
-            _target = new ActionBlock<string>((message) =>
+            _target = new ActionBlock<string>(async (message) =>
             {
-                ((BatchBlock<string>)_source).Post(message);
+                await ((BatchBlock<string>)_source).SendAsync(message);
             });
 
             _target.Completion.ContinueWith(t =>
@@ -35,12 +30,9 @@ namespace Trucking.Gps
                 else
                     _source.Complete();
             });
-
-            _pendingTasks.Add(_source.Completion);
-            _pendingTasks.Add(_target.Completion);
         }
 
-        public Task Completion => Task.WhenAll(_pendingTasks);
+        public Task Completion => _target.Completion;
 
         public void Complete()
         {
